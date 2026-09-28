@@ -1,0 +1,17 @@
+# Xcode
+build/
+DerivedData/
+*.xcuserstate
+xcuserdata/
+*.xcscmblueprint
+*.xccheckout
+
+# The .xcodeproj is generated from project.yml by XcodeGen, but it is kept in
+# the repo so the project opens in Xcode without installing anything.
+
+# macOS
+.DS_Store
+
+# Swift Package Manager
+.build/
+.swiftpm/

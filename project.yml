@@ -1,0 +1,112 @@
+# XcodeGen spec. Regenerate the Xcode project with:  xcodegen
+# Source folders are "synced", so files you add in Xcode or on disk are picked up
+# automatically — you only need to re-run xcodegen when you change this file.
+name: LockedIn
+
+options:
+  bundleIdPrefix: com.sainagamalla
+  deploymentTarget:
+    iOS: "18.0"
+  developmentLanguage: en
+  createIntermediateGroups: true
+
+settings:
+  base:
+    DEVELOPMENT_TEAM: D8S82G8B68
+    CODE_SIGN_STYLE: Automatic
+    MARKETING_VERSION: "1.0"
+    CURRENT_PROJECT_VERSION: "1"
+    TARGETED_DEVICE_FAMILY: "1"
+    SWIFT_VERSION: "6.0"
+    SWIFT_DEFAULT_ACTOR_ISOLATION: MainActor
+    SWIFT_APPROACHABLE_CONCURRENCY: YES
+    ENABLE_USER_SCRIPT_SANDBOXING: YES
+    ENABLE_PREVIEWS: YES
+    SWIFT_EMIT_LOC_STRINGS: YES
+
+targets:
+  LockedIn:
+    type: application
+    platform: iOS
+    sources:
+      - path: LockedIn
+        type: syncedFolder
+      - path: Shared
+        type: syncedFolder
+    info:
+      path: Config/LockedIn-Info.plist
+      properties:
+        CFBundleDisplayName: LockedIn
+        CFBundleShortVersionString: $(MARKETING_VERSION)
+        CFBundleVersion: $(CURRENT_PROJECT_VERSION)
+        LSRequiresIPhoneOS: true
+        ITSAppUsesNonExemptEncryption: false
+        NSSupportsLiveActivities: true
+        # Keeps LockedIn running during a session so it hears locks and unlocks in any app.
+        UIBackgroundModes:
+          - audio
+        UIUserInterfaceStyle: Dark
+        UIApplicationSceneManifest:
+          UIApplicationSupportsMultipleScenes: false
+        UILaunchScreen:
+          UIColorName: LaunchBackground
+        UIRequiresFullScreen: true
+        UISupportedInterfaceOrientations:
+          - UIInterfaceOrientationPortrait
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.sainagamalla.lockedin
+        ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
+        ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME: AccentColor
+    dependencies:
+      - target: LockedInWidgets
+        embed: true
+
+  LockedInWidgets:
+    type: app-extension
+    platform: iOS
+    sources:
+      - path: LockedInWidgets
+        type: syncedFolder
+      - path: Shared
+        type: syncedFolder
+    info:
+      path: Config/LockedInWidgets-Info.plist
+      properties:
+        CFBundleDisplayName: LockedIn
+        CFBundleShortVersionString: $(MARKETING_VERSION)
+        CFBundleVersion: $(CURRENT_PROJECT_VERSION)
+        NSExtension:
+          NSExtensionPointIdentifier: com.apple.widgetkit-extension
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.sainagamalla.lockedin.widgets
+        SKIP_INSTALL: YES
+
+  LockedInTests:
+    type: bundle.unit-test
+    platform: iOS
+    sources:
+      - path: LockedInTests
+        type: syncedFolder
+    dependencies:
+      - target: LockedIn
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.sainagamalla.lockedin.tests
+        GENERATE_INFOPLIST_FILE: YES
+
+schemes:
+  LockedIn:
+    build:
+      targets:
+        LockedIn: all
+        LockedInTests: [test]
+    run:
+      config: Debug
+    test:
+      config: Debug
+      targets:
+        - LockedInTests
+    archive:
+      config: Release
