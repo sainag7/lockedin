@@ -20,14 +20,15 @@ final class AppModel {
         let settings = AppSettings()
         let diagnostics = DiagnosticsLog()
         let notifications = NotificationScheduler(settings: settings)
-        let liveActivities = LiveActivityController { diagnostics.add(.session, $0) }
+        let keepAlive = SilentAudioKeepAlive { diagnostics.add(.session, $0) }
+        let liveActivities = LiveActivityController { diagnostics.add(.widget, $0) }
 
         let engine = SessionEngine(
             store: UserDefaultsSessionStore(),
             liveActivity: liveActivities,
             notifier: notifications,
             archive: SessionArchiver(context: container.mainContext),
-            keepAlive: SilentAudioKeepAlive { diagnostics.add(.session, $0) },
+            keepAlive: keepAlive,
             config: { settings.engineConfig },
             dayInterval: { settings.statsCalendar.interval(containing: $0) },
             bootTime: BootTime.current
@@ -46,5 +47,8 @@ final class AppModel {
         detector.start()
         engine.restoreAfterLaunch()
         notifications.updateDailyReminder()
+        #if DEBUG
+        WidgetSelfTest.runIfRequested(engine: engine, liveActivity: liveActivities, log: diagnostics)
+        #endif
     }
 }

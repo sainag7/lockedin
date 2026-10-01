@@ -176,7 +176,8 @@ final class SessionEngine {
     /// Kept current by `LockDetector`; drives the "no passcode" warning.
     var deviceHasPasscode = true
 
-    /// iOS makes protected data unavailable about this long after the phone locks.
+    /// Protected data goes away about this long after the phone locks. iOS posts its "will become
+    /// unavailable" notice at the lock itself, so only a lock spotted by polling is this late.
     static let protectedDataLockDelay: TimeInterval = 10
 
     @ObservationIgnored private let store: ActiveSessionStoring
@@ -340,14 +341,12 @@ final class SessionEngine {
 
     /// The phone is locked. After a lock-like transition, counting starts from the moment the app
     /// went to the background. After a slower one, the lock came later (say, from the Home Screen),
-    /// so counting starts roughly when iOS locked, judging by when the protected data went away.
+    /// so counting starts at `lockedAt`, the detector's best guess at when the phone locked.
     /// Returns when counting starts.
     @discardableResult
-    func lockConfirmed(verified: Bool, at time: Date) -> Date? {
+    func lockConfirmed(verified: Bool, lockedAt: Date) -> Date? {
         guard var s = session, let check = s.pendingCheck else { return nil }
-        let since = check.lockLikeTransition
-            ? check.backgroundedAt
-            : max(check.backgroundedAt, time.addingTimeInterval(-Self.protectedDataLockDelay))
+        let since = check.lockLikeTransition ? check.backgroundedAt : max(check.backgroundedAt, lockedAt)
         s.pendingCheck = nil
         s.state = .locked(since: since, verified: verified)
         s.idleSince = nil
@@ -377,7 +376,7 @@ final class SessionEngine {
             return .unlockedQuickly
         }
         if check.lockLikeTransition {
-            lockConfirmed(verified: false, at: check.backgroundedAt)
+            lockConfirmed(verified: false, lockedAt: check.backgroundedAt)
             return .locked(verified: false)
         }
         s.pendingCheck = nil
@@ -445,9 +444,9 @@ final class SessionEngine {
         syncKeepAlive()
     }
 
-    /// The phone locked while LockedIn was in the background, from whatever app was open. iOS
-    /// reports it about `protectedDataLockDelay` late, so counting starts at `estimate`, never
-    /// earlier than the pause began. After a long break, the session ends instead of resuming.
+    /// The phone locked while LockedIn was in the background, from whatever app was open. Counting
+    /// starts at `estimate`, never earlier than the pause began. After a long break, the session
+    /// ends instead of resuming.
     @discardableResult
     func deviceLocked(estimatedAt estimate: Date, now: Date = .now) -> Bool {
         guard var s = session, !s.isLocked, !s.isOnBreak, s.pendingCheck == nil else { return false }

@@ -5,6 +5,11 @@ import Foundation
 /// mixable audio session, so it never interrupts your music. While it plays, iOS keeps delivering
 /// the phone's lock and unlock signals to LockedIn, whichever app is open.
 ///
+/// The session uses the `.playAndRecord` category (it only ever plays; it never records). iOS drops
+/// Live Activity updates from an app kept awake only by a plain `.playback` session, but allows them
+/// from a `.playAndRecord` one (see `LiveActivityController`). It needs no microphone permission,
+/// because nothing opens the input.
+///
 /// Note: the App Store doesn't allow silent audio just to stay awake. Publishing would mean turning
 /// this into audible focus sounds (rain, brown noise) the person chooses to play.
 final class SilentAudioKeepAlive: BackgroundKeepingAlive {
@@ -51,7 +56,9 @@ final class SilentAudioKeepAlive: BackgroundKeepingAlive {
 
     private func play() throws {
         let session = AVAudioSession.sharedInstance()
-        try session.setCategory(.playback, mode: .default, options: [.mixWithOthers])
+        // Play-and-record (output only) so iOS accepts Live Activity updates from the background;
+        // mixWithOthers keeps it from interrupting the person's music.
+        try session.setCategory(.playAndRecord, mode: .default, options: [.mixWithOthers, .defaultToSpeaker, .allowBluetoothA2DP])
         try session.setActive(true)
         if player == nil {
             let player = try AVAudioPlayer(data: Self.silence)

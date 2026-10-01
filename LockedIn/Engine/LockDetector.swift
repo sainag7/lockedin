@@ -25,16 +25,23 @@ nonisolated enum DetectionMode: String, CaseIterable, Codable, Sendable {
 
 /// Turns app lifecycle and data-protection events into lock evidence for `SessionEngine`.
 ///
-/// iOS has no public "screen locked" API, so the first call is made on timing: a lock backgrounds
-/// the app almost instantly, while going Home or switching apps animates first. A lock-like
-/// transition starts the timer at once; anything slower keeps it stopped.
+/// iOS has no public "screen locked" API, but on a phone with a passcode it posts "protected data
+/// will become unavailable" the moment the phone locks (the data itself goes about 10 seconds
+/// later) and "did become available" the moment it unlocks. LockedIn only hears these while it's
+/// running, so it also judges by timing: a lock backgrounds the app almost instantly, while going
+/// Home or switching apps animates first. A lock-like transition starts the timer at once; anything
+/// slower keeps it stopped.
 ///
-/// To confirm, LockedIn keeps running for about 25 seconds (a background task) and watches for the
-/// phone's protected data becoming unavailable, which iOS does about 10 seconds after a lock (up to
-/// ~40 s if the phone was just unlocked). That also catches a lock the timing misjudged.
+/// When the lock notice arrives just before LockedIn leaves the screen, that settles it. Otherwise
+/// LockedIn keeps running for a while (a background task of about 25 seconds, or longer with
+/// background tracking) and watches for the notice or for the data going away, which also catches
+/// a lock the timing misjudged.
 final class LockDetector: NSObject {
     /// Resign-active → background faster than this looks like a lock rather than an app switch.
     static let lockLikeGap: TimeInterval = 0.15
+    /// A lock notice this recent when LockedIn leaves the screen means the phone locked it away.
+    /// It normally arrives a few milliseconds before the app starts leaving.
+    static let lockSignalWindow: TimeInterval = 2
     /// Longest we wait in the background for the lock signal (a background task lasts ~30 s).
     static let maxCheckWindow: TimeInterval = 25
     /// With background tracking there's no time limit, so wait past iOS's slowest lock report (~40 s).
@@ -46,6 +53,8 @@ final class LockDetector: NSObject {
 
     private var resignedActiveAt: Date?
     private var backgroundedAt: Date?
+    /// When iOS last said the phone was locking; cleared when it unlocks.
+    private var lockSignalAt: Date?
     private var backgroundTask: UIBackgroundTaskIdentifier = .invalid
     private var checkTask: Task<Void, Never>?
     private var tickTask: Task<Void, Never>?
@@ -105,6 +114,9 @@ final class LockDetector: NSObject {
         let now = Date.now
         backgroundedAt = now
         let gap = resignedActiveAt.map { now.timeIntervalSince($0) }
+        // Measure each exit from its own resign; an exit without one (the app never became
+        // active) isn't a lock-like transition.
+        resignedActiveAt = nil
         let lockLike = gap.map { $0 <= Self.lockLikeGap } ?? false
         let protected = UIApplication.shared.isProtectedDataAvailable ? "available" : "unavailable"
         log.add(.lifecycle, "Entered background: resign→background \(Self.ms(gap)) (\(lockLike ? "lock-like" : "app-switch-like")), protected data \(protected)")
@@ -114,7 +126,14 @@ final class LockDetector: NSObject {
         if mode() == .assumeLock {
             engine.appDidEnterBackground(at: now, lockLikeTransition: lockLike)
             log.add(.verdict, "Locked (assume-locked mode)")
-            engine.lockConfirmed(verified: false, at: now)
+            engine.lockConfirmed(verified: false, lockedAt: now)
+            return
+        }
+        if let signal = lockSignalAt, now.timeIntervalSince(signal) <= Self.lockSignalWindow {
+            // iOS said the phone was locking just as LockedIn left the screen: no check needed.
+            engine.appDidEnterBackground(at: now, lockLikeTransition: true)
+            engine.lockConfirmed(verified: true, lockedAt: signal)
+            log.add(.verdict, "Locked: iOS reported the lock as LockedIn left the screen")
             return
         }
         if !lockLike && engine.tracksLocksAnywhere {
@@ -145,22 +164,30 @@ final class LockDetector: NSObject {
 
     // MARK: Protected data
 
+    /// Posted the moment the phone locks.
     @objc private func protectedDataWillBecomeUnavailable() {
+        let now = Date.now
+        lockSignalAt = now
         log.add(.protectedData, "Will become unavailable (phone locking)")
         if isChecking {
-            confirmLock(source: "notification")
+            confirmLock(source: "lock signal", lockedAt: now)
         } else if engine.tracksLocksAnywhere, UIApplication.shared.applicationState == .background {
-            // Locked from another app. iOS reports this about 10 s after the lock, so count from then.
-            let estimate = Date.now.addingTimeInterval(-SessionEngine.protectedDataLockDelay)
-            if engine.deviceLocked(estimatedAt: estimate) {
-                log.add(.verdict, "Locked from another app: timer resumed, counting from ~\(Int(SessionEngine.protectedDataLockDelay))s ago")
+            // Locked from another app.
+            if engine.deviceLocked(estimatedAt: now) {
+                log.add(.verdict, "Locked from another app: timer resumed")
             }
         }
     }
 
+    /// Posted the moment the phone unlocks.
     @objc private func protectedDataDidBecomeAvailable() {
+        lockSignalAt = nil
         log.add(.protectedData, "Became available (phone unlocked)")
-        if engine.tracksLocksAnywhere, engine.deviceUnlocked(at: .now) {
+        if isChecking, engine.session?.pendingCheck?.lockLikeTransition == true {
+            // Unlocked before the lock was confirmed: it was a lock, so count it before stopping.
+            confirmLock(source: "unlock signal", lockedAt: backgroundedAt ?? .now)
+        }
+        if engine.deviceUnlocked(at: .now) {
             log.add(.verdict, "Unlocked: timer stopped")
         }
     }
@@ -187,7 +214,8 @@ final class LockDetector: NSObject {
                 try? await Task.sleep(for: .seconds(1))
                 guard let self, !Task.isCancelled else { return }
                 if !UIApplication.shared.isProtectedDataAvailable {
-                    self.confirmLock(source: "poll")
+                    // The data goes about 10 s after the lock, so the lock came that much earlier.
+                    self.confirmLock(source: "data check", lockedAt: .now.addingTimeInterval(-SessionEngine.protectedDataLockDelay))
                     return
                 }
             }
@@ -196,15 +224,16 @@ final class LockDetector: NSObject {
         }
     }
 
-    private func confirmLock(source: String) {
+    /// Confirms the pending lock check. `lockedAt` is when the phone locked, as best `source` tells.
+    private func confirmLock(source: String, lockedAt: Date) {
         guard isChecking else { return }
         let now = Date.now
         let delay = backgroundedAt.map { now.timeIntervalSince($0) } ?? 0
-        let since = engine.lockConfirmed(verified: true, at: now)
+        let since = engine.lockConfirmed(verified: true, lockedAt: lockedAt)
         var offset: TimeInterval = 0
         if let since, let start = backgroundedAt { offset = since.timeIntervalSince(start) }
         let counting = offset < 0.5 ? "counting from when it backgrounded" : "counting from \(String(format: "%.0f", offset))s after it backgrounded"
-        log.add(.verdict, "Locked: protected data went away \(String(format: "%.1f", delay))s after backgrounding (\(source)), \(counting)")
+        log.add(.verdict, "Locked: confirmed by the \(source) \(String(format: "%.1f", delay))s after backgrounding, \(counting)")
         endCheck()
     }
 

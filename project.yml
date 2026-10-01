@@ -42,6 +42,7 @@ targets:
         LSRequiresIPhoneOS: true
         ITSAppUsesNonExemptEncryption: false
         NSSupportsLiveActivities: true
+        NSMicrophoneUsageDescription: LockedIn keeps your Lock Screen timer in sync. It never records.
         # Keeps LockedIn running during a session so it hears locks and unlocks in any app.
         UIBackgroundModes:
           - audio

@@ -13,7 +13,7 @@ final class DiagnosticsLog {
     }
 
     nonisolated enum Kind: String, Codable, Sendable {
-        case lifecycle, protectedData, check, verdict, session
+        case lifecycle, protectedData, check, verdict, session, widget
 
         var label: String {
             switch self {
@@ -22,6 +22,7 @@ final class DiagnosticsLog {
             case .check: "Check"
             case .verdict: "Verdict"
             case .session: "Session"
+            case .widget: "Widget"
             }
         }
     }

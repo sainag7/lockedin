@@ -25,7 +25,7 @@ struct DiagnosticsView: View {
             } header: {
                 Text("Lock detection")
             } footer: {
-                Text("Automatic uses the phone's own lock and unlock signals (a lock is reported about 10 seconds late) plus how fast LockedIn leaves the screen. “Always assume locked” counts every trip away from the app as locked, useful in the simulator.")
+                Text("Automatic uses the phone's own lock and unlock signals plus how fast LockedIn leaves the screen. “Always assume locked” counts every trip away from the app as locked, useful in the simulator.")
             }
 
             Section {
@@ -76,6 +76,7 @@ struct DiagnosticsView: View {
         case .session: Palette.streak
         case .check: Palette.paused
         case .lifecycle: Palette.textSecondary
+        case .widget: Color(hex: 0xC4B5FD)
         }
     }
 }

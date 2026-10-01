@@ -108,10 +108,10 @@ let hour: TimeInterval = 3600
 // MARK: - Tests
 
 struct SessionEngineTests {
-    /// Locks at `lockAt` (confirmed by the protected-data signal 10 s later) and unlocks at `unlockAt`.
+    /// Locks at `lockAt` (confirmed by iOS's lock signal) and unlocks at `unlockAt`.
     private func lockStretch(_ engine: SessionEngine, from lockAt: Date, to unlockAt: Date) {
         engine.appDidEnterBackground(at: lockAt, lockLikeTransition: true)
-        engine.lockConfirmed(verified: true, at: lockAt + 10)
+        engine.lockConfirmed(verified: true, lockedAt: lockAt)
         engine.appDidBecomeActive(at: unlockAt)
     }
 
@@ -122,7 +122,7 @@ struct SessionEngineTests {
 
         engine.appDidEnterBackground(at: t0 + 5, lockLikeTransition: true)
         #expect(harness.live.states.last?.phase == .locked, "A lock starts the Lock Screen timer right away")
-        engine.lockConfirmed(verified: true, at: t0 + 15)
+        engine.lockConfirmed(verified: true, lockedAt: t0 + 5)
         #expect(engine.session?.lockedSince == t0 + 5)
 
         engine.appDidBecomeActive(at: t0 + 605)
@@ -194,14 +194,14 @@ struct SessionEngineTests {
         #expect(engine.session?.stretches.first?.verified == false)
     }
 
-    @Test func lockAfterGoingHomeCountsFromRoughlyWhenItLocked() {
+    @Test func lockAfterGoingHomeCountsFromWhenItLocked() {
         let harness = Harness()
         let engine = harness.makeEngine()
         engine.start(subjectID: nil, targetSeconds: nil, at: t0)
 
-        // Went Home, then locked; protected data went away 25 s after leaving the app.
+        // Went Home, then locked 15 s after leaving the app.
         engine.appDidEnterBackground(at: t0, lockLikeTransition: false)
-        #expect(engine.lockConfirmed(verified: true, at: t0 + 25) == t0 + 15)
+        #expect(engine.lockConfirmed(verified: true, lockedAt: t0 + 15) == t0 + 15)
         engine.appDidBecomeActive(at: t0 + 615)
 
         #expect(engine.session?.bankedSeconds == 600)
@@ -212,9 +212,10 @@ struct SessionEngineTests {
         let engine = harness.makeEngine()
         engine.start(subjectID: nil, targetSeconds: nil, at: t0)
 
-        // A slow lock transition, confirmed by protected data 8 s later.
+        // A slow lock transition. The data went away 8 s later, which puts the lock ~2 s before
+        // the app left the screen.
         engine.appDidEnterBackground(at: t0, lockLikeTransition: false)
-        #expect(engine.lockConfirmed(verified: true, at: t0 + 8) == t0)
+        #expect(engine.lockConfirmed(verified: true, lockedAt: t0 - 2) == t0)
         #expect(harness.live.states.last?.phase == .locked)
     }
 
@@ -271,7 +272,7 @@ struct SessionEngineTests {
         let first = harness.makeEngine()
         first.start(subjectID: nil, targetSeconds: nil, at: t0)
         first.appDidEnterBackground(at: t0 + 1, lockLikeTransition: true)
-        first.lockConfirmed(verified: true, at: t0 + 11)
+        first.lockConfirmed(verified: true, lockedAt: t0 + 1)
 
         // iOS kills the app while the phone is locked; the unlock relaunches it.
         let relaunched = harness.makeEngine()
@@ -332,7 +333,7 @@ struct SessionEngineTests {
         lockStretch(engine, from: t0, to: t0 + 10 * minute)
 
         engine.appDidEnterBackground(at: t0 + 12 * minute, lockLikeTransition: true)
-        engine.lockConfirmed(verified: true, at: t0 + 12 * minute + 10)
+        engine.lockConfirmed(verified: true, lockedAt: t0 + 12 * minute)
         harness.bootTime = t0 + 2 * hour
         engine.appDidBecomeActive(at: t0 + 5 * hour)
 
@@ -351,7 +352,7 @@ struct SessionEngineTests {
 
         let since = t0 + 30 * minute
         engine.appDidEnterBackground(at: since, lockLikeTransition: true)
-        engine.lockConfirmed(verified: true, at: since + 10)
+        engine.lockConfirmed(verified: true, lockedAt: since)
         let plan = harness.notifier.lockedPlans.last
 
         // 20 of 50 target minutes banked → 30 to go.
@@ -368,7 +369,7 @@ struct SessionEngineTests {
         lockStretch(engine, from: t0, to: t0 + 15 * minute)
 
         engine.appDidEnterBackground(at: t0 + 16 * minute, lockLikeTransition: true)
-        engine.lockConfirmed(verified: true, at: t0 + 16 * minute + 10)
+        engine.lockConfirmed(verified: true, lockedAt: t0 + 16 * minute)
         #expect(harness.notifier.lockedPlans.last?.targetAt == nil)
     }
 
@@ -475,7 +476,7 @@ struct SessionEngineTests {
         let engine = harness.makeEngine()
         engine.start(subjectID: nil, targetSeconds: nil, at: t0)
         engine.appDidEnterBackground(at: t0, lockLikeTransition: true)
-        engine.lockConfirmed(verified: true, at: t0 + 10)
+        engine.lockConfirmed(verified: true, lockedAt: t0)
 
         #expect(engine.deviceUnlocked(at: t0 + 600))
         #expect(engine.session?.bankedSeconds == 600)
@@ -510,9 +511,9 @@ struct SessionEngineTests {
         engine.start(subjectID: nil, targetSeconds: nil, at: t0)
         lockStretch(engine, from: t0, to: t0 + 10 * minute)
 
-        // Used other apps, then locked at +15m; iOS reports the lock 10 s later.
-        let reported = t0 + 15 * minute + 10
-        #expect(engine.deviceLocked(estimatedAt: reported - 10, now: reported))
+        // Used other apps, then locked at +15m; iOS reports the lock as it happens.
+        let locked = t0 + 15 * minute
+        #expect(engine.deviceLocked(estimatedAt: locked, now: locked))
         #expect(engine.session?.lockedSince == t0 + 15 * minute)
         #expect(harness.live.states.last?.phase == .locked)
 
@@ -527,9 +528,39 @@ struct SessionEngineTests {
         engine.start(subjectID: nil, targetSeconds: nil, at: t0)
         lockStretch(engine, from: t0, to: t0 + 10 * minute)
 
-        // Unlocked at +10m and locked again at once, so the 10 s estimate lands before the unlock.
+        // An estimate from before the last unlock never counts time the phone was unlocked.
         engine.deviceLocked(estimatedAt: t0 + 10 * minute - 5, now: t0 + 10 * minute + 5)
         #expect(engine.session?.lockedSince == t0 + 10 * minute)
+    }
+
+    @Test func aShortLockFromAnotherAppCreditsJustThoseSeconds() {
+        let harness = Harness()
+        let engine = harness.makeEngine()
+        engine.start(subjectID: nil, targetSeconds: nil, at: t0)
+        lockStretch(engine, from: t0, to: t0 + 10 * minute)
+
+        // Locked from another app for 4 s.
+        engine.deviceLocked(estimatedAt: t0 + 12 * minute, now: t0 + 12 * minute)
+        engine.deviceUnlocked(at: t0 + 12 * minute + 4)
+        #expect(engine.lastCredit?.seconds == 4)
+        #expect(engine.session?.bankedSeconds == 10 * minute + 4)
+    }
+
+    @Test func unlockingRightAfterALockInsideTheAppStopsTheWidgetAtOnce() {
+        let harness = Harness()
+        let engine = harness.makeEngine()
+        engine.start(subjectID: nil, targetSeconds: nil, at: t0)
+
+        // Locked from LockedIn, then unlocked 7 s later: the detector confirms the lock as of
+        // leaving the screen, then reports the unlock.
+        engine.appDidEnterBackground(at: t0 + 2, lockLikeTransition: true)
+        engine.lockConfirmed(verified: true, lockedAt: t0 + 2)
+        #expect(engine.deviceUnlocked(at: t0 + 9))
+
+        #expect(engine.session?.bankedSeconds == 7)
+        #expect(engine.session?.state == .paused(.unlocked))
+        #expect(engine.session?.stretches.first?.verified == true)
+        #expect(harness.live.states.last?.phase == .paused)
     }
 
     @Test func lockingAfterALongBreakEndsTheSessionInstead() {
@@ -539,7 +570,7 @@ struct SessionEngineTests {
         lockStretch(engine, from: t0, to: t0 + 30 * minute)
 
         let later = t0 + 3 * hour
-        #expect(!engine.deviceLocked(estimatedAt: later - 10, now: later))
+        #expect(!engine.deviceLocked(estimatedAt: later, now: later))
         #expect(engine.session == nil)
         #expect(harness.archive.archived.first?.endedAt == t0 + 30 * minute)
         #expect(harness.archive.archived.first?.reason == .idle)
@@ -552,7 +583,7 @@ struct SessionEngineTests {
         let engine = harness.makeEngine()
         engine.start(subjectID: nil, targetSeconds: nil, at: t0)
         engine.appDidEnterBackground(at: t0, lockLikeTransition: true)
-        engine.lockConfirmed(verified: true, at: t0 + 10)
+        engine.lockConfirmed(verified: true, lockedAt: t0)
 
         engine.tick(at: t0 + 2 * hour)
         #expect(engine.session != nil)
@@ -582,7 +613,7 @@ struct SessionEngineTests {
         #expect(harness.live.states.last?.breakSince == t0 + 11 * minute)
 
         // Locking from any app, or from LockedIn, doesn't count.
-        #expect(!engine.deviceLocked(estimatedAt: t0 + 15 * minute, now: t0 + 15 * minute + 10))
+        #expect(!engine.deviceLocked(estimatedAt: t0 + 15 * minute, now: t0 + 15 * minute))
         engine.appDidEnterBackground(at: t0 + 16 * minute, lockLikeTransition: true)
         #expect(engine.session?.pendingCheck == nil)
         engine.appDidBecomeActive(at: t0 + 30 * minute)
@@ -695,7 +726,7 @@ struct SessionEngineTests {
 
         engine.appDidEnterBackground(at: t0, lockLikeTransition: true)
         #expect(!engine.canPause)
-        engine.lockConfirmed(verified: true, at: t0 + 10)
+        engine.lockConfirmed(verified: true, lockedAt: t0)
         engine.pause(at: t0 + 20)
         #expect(engine.session?.isOnBreak == false)
         #expect(engine.session?.isLocked == true)

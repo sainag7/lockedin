@@ -61,7 +61,7 @@ During a session, locking your phone starts the timer and unlocking stops it, wh
 - **Staying awake:** iOS normally suspends an app you've left, and a suspended app hears nothing. So during a session LockedIn keeps running in the background by playing silence through a mixable audio session. It never interrupts your music, and it stops when the session ends.
 - **Unlock:** iOS makes the phone's protected data available the moment it unlocks, so the timer stops immediately, whatever app the phone opens to.
 - **Lock:** iOS signals the lock the moment it happens, so the timer resumes right away, whatever app is open.
-- **Lock Screen updates:** iOS ignores Live Activity updates from an app that's awake only to play background audio. So LockedIn holds a brief background task for each update, which iOS accepts.
+- **Lock Screen updates:** iOS ignores Live Activity updates from an app kept awake only by plain background audio. LockedIn's keep-alive uses a play-and-record audio session (output only — it never records and needs no microphone permission), which iOS does accept, so the Lock Screen keeps up in any app.
 - **Locking from inside LockedIn** also works without background tracking: iOS reports the lock as LockedIn leaves the screen. Without a passcode, LockedIn goes by timing instead: a lock takes the app off screen within milliseconds, while going Home animates first.
 
 Turn off **Settings → Track locks in any app** to go back to counting only locks made from inside LockedIn. That mode uses no background audio.

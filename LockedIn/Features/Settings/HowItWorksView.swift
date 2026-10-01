@@ -44,8 +44,7 @@ struct HowItWorksView: View {
         "It works from any app. During a session LockedIn keeps running quietly in the background (it plays silence), so locking your phone starts the timer and unlocking stops it, whatever app is open. You can turn this off in Settings.",
         "Unlocking counts the moment the phone unlocks, including a quick Face ID glance at the Lock Screen.",
         "Need a real break? Tap Pause. Locking your phone won't count until you tap Resume, and you can set a reminder for when the break's over.",
-        "iPhone reports a lock about 10 seconds after it happens, so after locking from another app the timer appears a few seconds late. Those seconds still count.",
-        "A session ends on its own if your phone stays locked past your auto-end limit (Settings), or if it's paused for over an hour.",
+        "A session ends on its own if your phone stays locked past your auto-end limit (Settings), stays unlocked for over an hour, or stays paused for over 4 hours.",
         "Tracking needs a device passcode. Without one, LockedIn can only count locks made from inside the app.",
         "Everything stays on your iPhone. No account, no servers.",
     ]
