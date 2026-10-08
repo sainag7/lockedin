@@ -11,7 +11,7 @@ import UIKit
 /// iOS ignores Live Activity updates from an app that's awake only to play plain background audio
 /// ("Process is only playing background media so is forbidden to update activity", in
 /// `liveactivitiesd`). LockedIn's keep-alive dodges this by using a `.playAndRecord` audio session,
-/// which iOS permits (see `SilentAudioKeepAlive`). Each update is still sent under a background task
+/// which iOS permits (see `BackgroundAudio`). Each update is still sent under a background task
 /// and confirmed against `contentUpdates`, which reports the states iOS actually shows, so a rare
 /// dropped update is retried.
 final class LiveActivityController: LiveActivityControlling {

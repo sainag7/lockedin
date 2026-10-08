@@ -8,6 +8,7 @@ struct ActiveSessionView: View {
     @Environment(SessionEngine.self) private var engine
     @Environment(AppSettings.self) private var settings
     @State private var confirmEnd = false
+    @State private var showSounds = false
     @State private var toast: StretchCredit?
 
     var body: some View {
@@ -31,6 +32,7 @@ struct ActiveSessionView: View {
         .padding(.top, 8)
         .padding(.bottom, 20)
         .overlay(alignment: .top) { toastView }
+        .sheet(isPresented: $showSounds) { SoundPicker() }
         .onAppear(perform: showToastIfRecent)
         .onChange(of: engine.lastCredit) { showToastIfRecent() }
         .haptic(.success, trigger: toast?.id, enabled: settings.hapticsEnabled && toast != nil)
@@ -59,7 +61,23 @@ struct ActiveSessionView: View {
             Text("Started \(session.startedAt.formatted(date: .omitted, time: .shortened))")
                 .font(.caption)
                 .foregroundStyle(Palette.textTertiary)
+            soundButton
         }
+    }
+
+    private var soundButton: some View {
+        let on = settings.backgroundSound != .none
+        return Button {
+            showSounds = true
+        } label: {
+            Image(systemName: on ? "speaker.wave.2.fill" : "speaker.slash.fill")
+                .font(.footnote.weight(.semibold))
+                .foregroundStyle(on ? Palette.accent : Palette.textSecondary)
+                .frame(width: 34, height: 34)
+                .background(Palette.surface, in: Circle())
+                .overlay(Circle().stroke(on ? Palette.accent.opacity(0.5) : Palette.stroke))
+        }
+        .accessibilityLabel(on ? "Background sound: \(settings.backgroundSound.name)" : "Background sound off")
     }
 
     private func pill(_ text: String, color: Color) -> some View {
@@ -322,6 +340,8 @@ private struct LockedContent: View {
                     .font(.system(size: 76, weight: .bold, design: .rounded))
                     .monospacedDigit()
                     .contentTransition(.numericText())
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.6)
             }
         }
     }

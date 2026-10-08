@@ -13,13 +13,16 @@ protocol LiveActivityControlling: AnyObject {
     func cleanUp(keeping sessionID: UUID?)
 }
 
-/// Keeps LockedIn running in the background during a session, so it hears every lock and unlock.
+/// Keeps LockedIn running in the background during a session, so it hears every lock and unlock,
+/// and plays the chosen focus sound.
 protocol BackgroundKeepingAlive: AnyObject {
     var isRunning: Bool { get }
     func start()
     func stop()
     /// Restarts playback if something stopped it.
     func ensurePlaying()
+    func setSound(_ sound: BackgroundSound)
+    func setVolume(_ volume: Double)
 }
 
 protocol SessionNotifying: AnyObject {
@@ -123,6 +126,10 @@ nonisolated struct EngineConfig: Sendable {
     var minimumSessionLength: TimeInterval = 60
     /// Keep LockedIn running in the background so locks and unlocks count in any app.
     var trackLocksAnywhere = true
+    /// The focus sound to play during a session (`none` = silence, keep-alive only).
+    var sound: BackgroundSound = .none
+    /// Focus-sound volume, 0...1.
+    var soundVolume: Double = 0.6
 }
 
 nonisolated enum LockVerdict: Equatable, Sendable {
@@ -301,20 +308,39 @@ final class SessionEngine {
 
     // MARK: Background tracking
 
-    /// True while LockedIn is running in the background to catch locks and unlocks in any app.
-    var tracksLocksAnywhere: Bool { session != nil && keepAlive.isRunning }
+    /// True while LockedIn is catching locks and unlocks in any app. The background audio may also be
+    /// running just to play a focus sound, which is why this checks the setting, not only the audio.
+    var tracksLocksAnywhere: Bool {
+        guard session != nil, keepAlive.isRunning else { return false }
+        return config().trackLocksAnywhere && deviceHasPasscode
+    }
 
-    /// Starts or stops background tracking to match the session and the setting.
+    /// Whether the background audio should run: to track locks, or to play a chosen focus sound.
+    private var needsBackgroundAudio: Bool {
+        let cfg = config()
+        return (cfg.trackLocksAnywhere && deviceHasPasscode) || !cfg.sound.isSilent
+    }
+
+    /// Starts or stops the background audio to match the session, the tracking setting and the sound.
     func syncKeepAlive() {
-        if let s = session, !s.isOnBreak, config().trackLocksAnywhere, deviceHasPasscode {
+        let cfg = config()
+        if let s = session, !s.isOnBreak, needsBackgroundAudio {
+            keepAlive.setSound(cfg.sound)
+            keepAlive.setVolume(cfg.soundVolume)
             keepAlive.start()
         } else {
             keepAlive.stop()
         }
     }
 
-    /// Call when the setting changes: matches background tracking to it and updates the Lock Screen hint.
+    /// Call when the tracking setting changes: re-syncs the audio and updates the Lock Screen hint.
     func trackingSettingChanged() {
+        syncKeepAlive()
+        if let s = session { pushLiveActivity(s) }
+    }
+
+    /// Call when the focus sound or its volume changes: applies it live.
+    func soundSettingChanged() {
         syncKeepAlive()
         if let s = session { pushLiveActivity(s) }
     }
@@ -643,7 +669,7 @@ final class SessionEngine {
                 lockedSince: since,
                 stopsAt: stopDate(lockedSince: since),
                 unlockCount: s.unlockCount,
-                tracksAnyApp: keepAlive.isRunning
+                tracksAnyApp: tracksLocksAnywhere
             )
         }
         if let breakSince = s.breakSince {
@@ -663,7 +689,7 @@ final class SessionEngine {
             lockedSince: nil,
             stopsAt: nil,
             unlockCount: s.unlockCount,
-            tracksAnyApp: keepAlive.isRunning
+            tracksAnyApp: tracksLocksAnywhere
         )
     }
 

@@ -16,6 +16,7 @@
 - **See the timer without unlocking.** A Live Activity on the Lock Screen and in the Dynamic Island shows the running time and your progress toward the target.
 - **Unlock = stop.** Picking up your phone stops the clock instantly, in any app. Each unlock is counted, so you can see how often you checked your phone.
 - **Take real breaks.** Pause a session for a break and set a 5–30 minute reminder. Break time doesn't count against your focus score.
+- **Play focus sounds.** Pick a background noise for your session from the speaker button: Dark (brown), Balanced (pink), Bright (white), plus Deep and Ocean. They're generated on the fly, loop seamlessly, mix with your music, and play while the phone is locked.
 - **Hit a daily goal and build streaks.** Set a daily goal, watch the ring fill up, and keep your streak going.
 - **See where your time goes.** Week, month, and year charts, a subject breakdown, your best hours of the day, and plain-English insights like "Up 32% from this point last month."
 - **Look back at every session.** A calendar heatmap of your history, with a timeline of each session's locked stretches and unlocks.
@@ -68,12 +69,14 @@ Turn off **Settings → Track locks in any app** to go back to counting only loc
 
 **Pause** holds a session for a real break. Locking the phone won't count until you tap **Resume**, and you can pick a 5–30 minute reminder. Background tracking stops while paused. A pause over 4 hours ends the session. Break time doesn't count against focus %.
 
+**Background sounds.** Pick a focus noise for the session from the speaker button (or Settings → Sounds): Dark, Balanced, Bright, Deep, Ocean. They're generated in code — no audio files — so they loop seamlessly and add nothing to the app size. The sound plays through the whole session, keeps playing while the phone is locked, mixes with your own music, and stops when the session ends. When a sound is playing it also serves as the keep-alive audio.
+
 **Things to know**
 
 - A quick Face ID glance at the Lock Screen unlocks the phone, so it pauses the timer until the phone locks again.
 - The background audio costs a little battery. The auto-end limit (default: 3 hours locked) and the one-hour unlocked limit stop forgotten sessions, and the audio with them.
 - Without a device passcode there are no lock signals, so only locks made from inside LockedIn count.
-- The App Store doesn't allow silent audio just to stay awake. Publishing would mean turning it into audible focus sounds.
+- For the App Store, the background audio must be a sound the person chooses to play, not silence purely to stay awake. Playing a focus sound covers that; a release build would make a sound the default (or only) option.
 
 ## Test it on your phone
 

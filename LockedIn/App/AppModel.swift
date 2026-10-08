@@ -20,7 +20,7 @@ final class AppModel {
         let settings = AppSettings()
         let diagnostics = DiagnosticsLog()
         let notifications = NotificationScheduler(settings: settings)
-        let keepAlive = SilentAudioKeepAlive { diagnostics.add(.session, $0) }
+        let keepAlive = BackgroundAudio { diagnostics.add(.session, $0) }
         let liveActivities = LiveActivityController { diagnostics.add(.widget, $0) }
 
         let engine = SessionEngine(
