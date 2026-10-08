@@ -63,9 +63,13 @@ final class FakeArchive: SessionArchiving {
 final class FakeKeepAlive: BackgroundKeepingAlive {
     var isRunning = false
     var restarts = 0
+    var sound: BackgroundSound = .none
+    var volume: Double = 0
     func start() { isRunning = true }
     func stop() { isRunning = false }
     func ensurePlaying() { restarts += 1 }
+    func setSound(_ sound: BackgroundSound) { self.sound = sound }
+    func setVolume(_ volume: Double) { self.volume = volume }
 }
 
 /// Builds engines over shared fakes, so a second engine can simulate a relaunch.
@@ -468,6 +472,27 @@ struct SessionEngineTests {
 
         engine.deviceHasPasscode = false
         engine.syncKeepAlive()
+        #expect(!harness.keepAlive.isRunning)
+    }
+
+    @Test func aFocusSoundRunsTheAudioEvenWhenTrackingIsOff() {
+        let harness = Harness()
+        harness.config.trackLocksAnywhere = false
+        harness.config.sound = .brown
+        harness.config.soundVolume = 0.4
+        let engine = harness.makeEngine()
+        engine.start(subjectID: nil, targetSeconds: nil, at: t0)
+
+        // Audio runs to play the sound, but lock tracking stays off per the setting.
+        #expect(harness.keepAlive.isRunning)
+        #expect(harness.keepAlive.sound == .brown)
+        #expect(harness.keepAlive.volume == 0.4)
+        #expect(!engine.tracksLocksAnywhere)
+        #expect(harness.live.states.last?.tracksAnyApp == false)
+
+        // Clearing the sound with tracking off stops the audio.
+        harness.config.sound = .none
+        engine.soundSettingChanged()
         #expect(!harness.keepAlive.isRunning)
     }
 

@@ -38,7 +38,26 @@ struct SettingsView: View {
                 } header: {
                     Text("Tracking")
                 } footer: {
-                    Text("During a session, LockedIn keeps running quietly in the background (it plays silence), so locking and unlocking count whatever app you're in. Uses a little extra battery. Turn it off to count only locks made from inside LockedIn.")
+                    Text("During a session, LockedIn keeps running quietly in the background, so locking and unlocking count whatever app you're in. Uses a little extra battery. Turn it off to count only locks made from inside LockedIn.")
+                }
+
+                Section {
+                    Picker("Focus sound", selection: $settings.backgroundSound) {
+                        ForEach(BackgroundSound.allCases, id: \.self) { sound in
+                            Text(sound.name).tag(sound)
+                        }
+                    }
+                    if settings.backgroundSound != .none {
+                        HStack(spacing: 12) {
+                            Image(systemName: "speaker.fill").foregroundStyle(Palette.textSecondary)
+                            Slider(value: $settings.soundVolume, in: 0...1)
+                            Image(systemName: "speaker.wave.3.fill").foregroundStyle(Palette.textSecondary)
+                        }
+                    }
+                } header: {
+                    Text("Sounds")
+                } footer: {
+                    Text("Play focus noise while you're locked in. Dark is deep brown noise, Balanced is pink, Bright is white. You can also pick it from the speaker button on the session screen.")
                 }
 
                 Section {
@@ -156,6 +175,8 @@ struct SettingsView: View {
             }
             .onChange(of: settings.dailyReminderMinutes) { notifications.updateDailyReminder() }
             .onChange(of: settings.trackLocksAnywhere) { engine.trackingSettingChanged() }
+            .onChange(of: settings.backgroundSound) { engine.soundSettingChanged() }
+            .onChange(of: settings.soundVolume) { engine.soundSettingChanged() }
         }
     }
 

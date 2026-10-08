@@ -25,6 +25,10 @@ final class AppSettings {
     var hapticsEnabled: Bool { didSet { defaults.set(hapticsEnabled, forKey: Key.hapticsEnabled) } }
     /// Keep LockedIn running in the background during sessions so locks count from any app.
     var trackLocksAnywhere: Bool { didSet { defaults.set(trackLocksAnywhere, forKey: Key.trackLocksAnywhere) } }
+    /// Focus sound to play during a session.
+    var backgroundSound: BackgroundSound { didSet { defaults.set(backgroundSound.rawValue, forKey: Key.backgroundSound) } }
+    /// Focus-sound volume, 0...1.
+    var soundVolume: Double { didSet { defaults.set(soundVolume, forKey: Key.soundVolume) } }
     var detectionMode: DetectionMode { didSet { defaults.set(detectionMode.rawValue, forKey: Key.detectionMode) } }
     var lastSubjectID: UUID? { didSet { defaults.set(lastSubjectID?.uuidString, forKey: Key.lastSubjectID) } }
 
@@ -43,6 +47,8 @@ final class AppSettings {
         dailyReminderMinutes = defaults.object(forKey: Key.dailyReminderMinutes) as? Int ?? 19 * 60
         hapticsEnabled = defaults.object(forKey: Key.hapticsEnabled) as? Bool ?? true
         trackLocksAnywhere = defaults.object(forKey: Key.trackLocksAnywhere) as? Bool ?? true
+        backgroundSound = defaults.string(forKey: Key.backgroundSound).flatMap(BackgroundSound.init(rawValue:)) ?? .none
+        soundVolume = defaults.object(forKey: Key.soundVolume) as? Double ?? 0.6
         detectionMode = defaults.string(forKey: Key.detectionMode).flatMap(DetectionMode.init(rawValue:)) ?? .platformDefault
         lastSubjectID = defaults.string(forKey: Key.lastSubjectID).flatMap(UUID.init(uuidString:))
     }
@@ -54,7 +60,9 @@ final class AppSettings {
             dailyGoal: dailyGoal,
             autoEndAfter: autoEndHours > 0 ? TimeInterval(autoEndHours * 3600) : nil,
             breakNudgeAfter: breakNudgeMinutes > 0 ? TimeInterval(breakNudgeMinutes * 60) : nil,
-            trackLocksAnywhere: trackLocksAnywhere && detectionMode == .automatic
+            trackLocksAnywhere: trackLocksAnywhere && detectionMode == .automatic,
+            sound: backgroundSound,
+            soundVolume: soundVolume
         )
     }
 
@@ -76,6 +84,8 @@ final class AppSettings {
         static let dailyReminderMinutes = "dailyReminderMinutes"
         static let hapticsEnabled = "hapticsEnabled"
         static let trackLocksAnywhere = "trackLocksAnywhere"
+        static let backgroundSound = "backgroundSound"
+        static let soundVolume = "soundVolume"
         static let detectionMode = "detectionMode"
         static let lastSubjectID = "lastSubjectID"
     }
