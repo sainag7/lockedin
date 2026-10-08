@@ -46,7 +46,7 @@ struct LockInLiveActivity: Widget {
                 SessionTimerText(state: state, isStale: context.isStale)
                     .font(.system(size: 14, weight: .semibold, design: .rounded))
                     .foregroundStyle(look.tint)
-                    .frame(maxWidth: 58)
+                    .frame(maxWidth: 64)
             } minimal: {
                 Image(systemName: look.icon)
                     .foregroundStyle(look.tint)
@@ -88,7 +88,8 @@ private struct LockScreenView: View {
                 SessionTimerText(state: state, isStale: isStale)
                     .font(.system(size: 36, weight: .semibold, design: .rounded))
                     .foregroundStyle(look.tint)
-                    .frame(maxWidth: 140, alignment: .trailing)
+                    .frame(maxWidth: 160, alignment: .trailing)
+                    .layoutPriority(1)
             }
 
             if let target = attributes.targetSeconds, target > 0 {
@@ -113,25 +114,31 @@ private struct LockScreenView: View {
 // MARK: - Pieces
 
 /// Counts up on its own while locked (no app updates needed); shows a fixed value otherwise.
+///
+/// `Text(timerInterval:)` reserves width for the value shown when the widget first renders, so once
+/// the timer passes an hour and grows from `MM:SS` to `H:MM:SS` it would overflow. Staying on one
+/// line and scaling down to fit keeps it legible instead of clipping.
 private struct SessionTimerText: View {
     let state: LockInActivityAttributes.ContentState
     let isStale: Bool
 
     var body: some View {
+        timer
+            .monospacedDigit()
+            .lineLimit(1)
+            .minimumScaleFactor(0.5)
+            .multilineTextAlignment(.trailing)
+    }
+
+    @ViewBuilder private var timer: some View {
         if state.phase == .locked, !isStale, let start = state.virtualStart {
             let end = state.stopsAt ?? start.addingTimeInterval(24 * 3600)
             Text(timerInterval: start...max(start, end), countsDown: false)
-                .monospacedDigit()
-                .multilineTextAlignment(.trailing)
         } else if state.phase == .onBreak, let since = state.breakSince {
             // While paused, the big number is how long the break has lasted.
             Text(timerInterval: since...since.addingTimeInterval(24 * 3600), countsDown: false)
-                .monospacedDigit()
-                .multilineTextAlignment(.trailing)
         } else {
             Text(DurationText.clock(isStale ? (state.secondsAtStop ?? state.banked) : state.banked))
-                .monospacedDigit()
-                .multilineTextAlignment(.trailing)
         }
     }
 }
